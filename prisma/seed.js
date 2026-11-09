@@ -15,8 +15,8 @@ async function main() {
     if (existing) return existing;
     return store.createUser({ name, email, passwordHash, role });
   }
-  const admin = upsertUser('Asha Admin', 'admin@demo.local', 'ADMIN');
-  const manager = upsertUser('Meera Manager', 'manager@demo.local', 'MANAGER');
+  const admin = upsertUser('Rashi', 'admin@demo.local', 'ADMIN');
+  const manager = upsertUser('Pragya', 'manager@demo.local', 'MANAGER');
   const member = upsertUser('Ravi Member', 'member@demo.local', 'MEMBER');
   let project = store.db.prepare('SELECT * FROM "Project" WHERE id = 1').get();
   if (!project) {
