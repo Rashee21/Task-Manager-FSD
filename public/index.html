@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Taskboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#e8ecef; --surface:#fbfcfc; --sunken:#dfe5e9; --ink:#14202b; --muted:#586774; --line:#c9d3da;
+  --accent:#0a6b6b; --accent-ink:#ffffff; --accent-soft:#d3e9e8;
+  --urgent:#8f1d3d; --high:#b5321b; --med:#a86b0c; --low:#2f7452; --danger:#b5321b;
+  --todo:#6d7a86; --prog:#2a62b8; --review:#8a4fb3; --done:#2f7452;
+  --display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;
+  --body:"Instrument Sans","Segoe UI",system-ui,sans-serif;
+  --r:10px;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#10171d; --surface:#18222b; --sunken:#0d1318; --ink:#e6edf2; --muted:#93a3b0; --line:#2b3945;
+  --accent:#4cc0bd; --accent-ink:#06201f; --accent-soft:#17383a;
+  --urgent:#ff6f9a; --high:#ff8a72; --med:#e8b05a; --low:#6fcf9b; --danger:#ff8a72;
+  --todo:#95a3af; --prog:#7aa7f0; --review:#c39be6; --done:#6fcf9b;}
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--body);-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:var(--display);margin:0;line-height:1.15;letter-spacing:-.01em}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.hidden{display:none!important}
+.muted{color:var(--muted)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+/* buttons & fields */
+.btn{border:1px solid var(--line);background:var(--surface);padding:7px 14px;border-radius:8px;font-weight:500}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.danger{color:var(--danger);border-color:color-mix(in srgb,var(--danger) 40%,var(--line))}
+.btn.ghost{border-color:transparent;background:transparent}
+.btn.sm{padding:4px 10px;font-size:13px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+label.f{display:block;font-size:13px;font-weight:600;margin-bottom:12px}
+label.f>span{display:block;margin-bottom:4px}
+.in{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+textarea.in{min-height:84px;resize:vertical}
+.in:focus{border-color:var(--accent)}
+.help{font-weight:400;color:var(--muted);font-size:12px;margin-top:3px}
+.row{display:flex;gap:10px}
+.row>*{flex:1;min-width:0}
+
+/* auth */
+#auth{min-height:100%;display:grid;grid-template-columns:1.1fr 1fr}
+.auth-art{background:var(--accent);color:var(--accent-ink);padding:56px;display:flex;flex-direction:column;justify-content:space-between;position:relative;overflow:hidden}
+.auth-art h1{font-size:clamp(40px,6vw,76px);font-weight:700;max-width:9ch}
+.auth-art p{max-width:34ch;opacity:.88;font-size:17px}
+.ghostcols{display:flex;gap:10px;align-items:flex-end;height:150px}
+.ghostcols i{flex:1;border:1.5px solid color-mix(in srgb,var(--accent-ink) 55%,transparent);border-radius:8px;display:block}
+.ghostcols i:nth-child(1){height:60%}.ghostcols i:nth-child(2){height:85%}.ghostcols i:nth-child(3){height:45%}.ghostcols i:nth-child(4){height:100%}
+.auth-form{display:flex;align-items:center;justify-content:center;padding:32px}
+.auth-card{width:100%;max-width:380px}
+.tabs{display:flex;gap:4px;background:var(--sunken);padding:4px;border-radius:10px;margin:18px 0 22px}
+.tabs button{flex:1;border:0;background:transparent;padding:7px;border-radius:7px;font-weight:600;color:var(--muted)}
+.tabs button[aria-selected=true]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.demo{display:flex;gap:6px;flex-wrap:wrap;margin-top:18px;align-items:center;font-size:13px}
+.chip{border:1px dashed var(--line);background:transparent;border-radius:999px;padding:3px 11px;font-size:13px}
+.chip:hover{border-style:solid;border-color:var(--accent)}
+details.srv{margin-top:26px;font-size:13px;color:var(--muted)}
+details.srv summary{cursor:pointer}
+.err{background:color-mix(in srgb,var(--danger) 12%,var(--surface));border:1px solid color-mix(in srgb,var(--danger) 45%,var(--line));color:var(--ink);padding:8px 12px;border-radius:8px;font-size:14px;margin-bottom:14px}
+
+/* shell */
+#app{display:grid;grid-template-columns:220px 1fr;min-height:100%}
+aside{background:var(--sunken);border-right:1px solid var(--line);padding:22px 14px;display:flex;flex-direction:column;gap:6px;position:sticky;top:0;height:100vh}
+.brand{font-family:var(--display);font-weight:700;font-size:22px;padding:0 10px 18px}
+nav{display:flex;flex-direction:column;gap:2px}
+nav button{display:flex;align-items:center;gap:10px;border:0;background:transparent;text-align:left;padding:8px 10px;border-radius:8px;font-weight:500;color:var(--muted)}
+nav button:hover{background:color-mix(in srgb,var(--surface) 60%,transparent);color:var(--ink)}
+nav button[aria-current=page]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.1)}
+nav svg{width:18px;height:18px;flex:none}
+.me{margin-top:auto;padding:12px 10px 0;border-top:1px solid var(--line);font-size:13px}
+.me b{display:block;font-size:14px}
+.role{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:0 8px;font-size:12px;margin:3px 0 8px}
+main{padding:26px 30px 60px;min-width:0}
+.topbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:20px}
+.topbar h2{font-size:30px;margin-right:auto}
+.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:18px}
+.filters .in{width:auto;min-width:130px}
+.filters input[type=search]{min-width:220px}
+.tog{display:inline-flex;align-items:center;gap:6px;font-size:14px}
+
+/* board */
+.board{display:grid;grid-template-columns:repeat(4,minmax(240px,1fr));gap:14px;align-items:start;overflow-x:auto;padding-bottom:10px}
+.col{background:var(--sunken);border-radius:var(--r);padding:10px;min-height:240px;border:2px solid transparent;transition:border-color .15s,opacity .15s,background .15s}
+.col header{display:flex;align-items:center;gap:8px;padding:2px 4px 10px;font-weight:600}
+.col header i{width:10px;height:10px;border-radius:50%;display:block}
+.col header span.n{margin-left:auto;font-weight:500;color:var(--muted);font-size:13px}
+.dragging .col.can{border-color:var(--accent);background:var(--accent-soft)}
+.dragging .col.cant{opacity:.45}
+.cards{display:flex;flex-direction:column;gap:8px;min-height:60px}
+.card{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--pc,var(--line));border-radius:8px;padding:10px 12px;cursor:grab;text-align:left;width:100%}
+.card:hover{border-color:var(--muted);border-left-color:var(--pc)}
+.card.lock{cursor:pointer}
+.card h3{font-family:var(--body);font-size:15px;font-weight:600;letter-spacing:0;margin-bottom:6px}
+.meta{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;font-size:12.5px;color:var(--muted)}
+.pri{font-weight:600}
+.pri.URGENT{color:var(--urgent)}.pri.HIGH{color:var(--high)}.pri.MEDIUM{color:var(--med)}.pri.LOW{color:var(--low)}
+.due.over{color:var(--danger);font-weight:600}
+.av{width:22px;height:22px;border-radius:50%;background:var(--accent-soft);color:var(--accent);font-size:11px;font-weight:700;display:inline-grid;place-items:center;margin-left:auto}
+.tag{background:var(--sunken);border-radius:4px;padding:0 6px;font-size:12px}
+.empty{padding:26px 12px;text-align:center;color:var(--muted);font-size:14px;border:1.5px dashed var(--line);border-radius:8px}
+
+/* table */
+.tw{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+table{width:100%;border-collapse:collapse;min-width:720px}
+th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);font-size:14px}
+th{font-size:13px;color:var(--muted);font-weight:600;white-space:nowrap}
+th button{border:0;background:none;font-weight:600;color:inherit;padding:0}
+th button:hover{color:var(--ink)}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:var(--sunken)}
+tr:last-child td{border-bottom:0}
+.st{display:inline-flex;align-items:center;gap:6px;font-weight:500}
+.st i{width:8px;height:8px;border-radius:50%;background:var(--c)}
+.pager{display:flex;gap:10px;align-items:center;justify-content:flex-end;margin-top:14px;font-size:14px}
+
+/* dashboard */
+.stack{display:flex;height:46px;border-radius:10px;overflow:hidden;background:var(--sunken);margin:12px 0 10px}
+.stack div{background:var(--c);min-width:0;transition:flex .4s}
+.legend{display:flex;gap:18px;flex-wrap:wrap;font-size:14px}
+.legend b{font-family:var(--display);font-size:20px;margin-right:4px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:20px 22px;margin-bottom:16px}
+.panel h3{font-size:18px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.bars{margin-top:14px;display:flex;flex-direction:column;gap:10px}
+.bar{display:grid;grid-template-columns:80px 1fr 32px;align-items:center;gap:10px;font-size:14px}
+.bar div{height:12px;background:var(--sunken);border-radius:6px;overflow:hidden}
+.bar div i{display:block;height:100%;background:var(--c);border-radius:6px}
+.bar b{text-align:right}
+.big{font-family:var(--display);font-size:44px;font-weight:700;line-height:1}
+
+/* projects / team */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.pj{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.pj h3{font-size:18px;margin-bottom:4px}
+.pj .acts{margin-top:12px;display:flex;gap:8px}
+.formpanel{max-width:460px}
+
+/* dialog */
+dialog{border:0;padding:0;background:var(--surface);color:var(--ink);width:min(560px,100vw);height:100vh;max-height:100vh;margin:0 0 0 auto;box-shadow:-8px 0 40px rgba(0,0,0,.28);overflow:auto}
+dialog::backdrop{background:rgba(10,18,24,.45)}
+.dlg{padding:24px 26px 30px}
+.dlg h2{font-size:24px;margin-bottom:18px}
+.allowed{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.acts2{display:flex;gap:8px;margin-top:6px;align-items:center}
+.acts2 .sp{margin-left:auto}
+.audit{margin-top:26px;border-top:1px solid var(--line);padding-top:16px}
+.audit ol{list-style:none;padding:0;margin:10px 0 0;display:flex;flex-direction:column;gap:10px}
+.audit li{font-size:13.5px;padding-left:14px;border-left:2px solid var(--line)}
+.audit s{color:var(--muted)}
+
+/* toast */
+#toasts{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:8px;z-index:50;align-items:center}
+.toast{background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:8px;font-size:14px;box-shadow:0 6px 24px rgba(0,0,0,.25);max-width:90vw}
+.toast.bad{background:var(--danger);color:#fff}
+
+@media (max-width:860px){
+  #auth{grid-template-columns:1fr}.auth-art{padding:28px;min-height:230px}.ghostcols{display:none}
+  #app{grid-template-columns:1fr}
+  aside{position:static;height:auto;flex-direction:row;align-items:center;flex-wrap:wrap;padding:10px 12px}
+  .brand{padding:0 8px 0 0}nav{flex-direction:row;flex-wrap:wrap}.me{margin:0 0 0 auto;border:0;padding:0}
+  .me .role,.me .btn{display:none}
+  main{padding:18px 14px 50px}.two{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<!-- ============ AUTH ============ -->
+<section id="auth" class="hidden">
+  <div class="auth-art">
+    <div class="brand" style="color:inherit;padding:0">Taskboard</div>
+    <div>
+      <h1>Move work forward.</h1>
+      <p style="margin-top:18px">Plan tasks, hand them off, and watch them travel from To do to Done.</p>
+    </div>
+    <div class="ghostcols" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+  </div>
+  <div class="auth-form">
+    <div class="auth-card">
+      <h2 style="font-size:28px">Welcome</h2>
+      <div class="tabs" role="tablist">
+        <button role="tab" id="tabLogin" aria-selected="true">Log in</button>
+        <button role="tab" id="tabReg" aria-selected="false">Create account</button>
+      </div>
+      <div id="authErr" class="err hidden" role="alert"></div>
+      <form id="loginForm">
+        <label class="f"><span>Email</span><input class="in" type="email" name="email" required autocomplete="username"></label>
+        <label class="f"><span>Password</span><input class="in" type="password" name="password" required autocomplete="current-password"></label>
+        <button class="btn primary" style="width:100%;padding:10px" type="submit">Log in</button>
+        <div class="demo"><span class="muted">Demo accounts:</span>
+          <button type="button" class="chip" data-demo="admin">Admin</button>
+          <button type="button" class="chip" data-demo="manager">Manager</button>
+          <button type="button" class="chip" data-demo="member">Member</button>
+        </div>
+      </form>
+      <form id="regForm" class="hidden">
+        <label class="f"><span>Name</span><input class="in" name="name" required minlength="2" autocomplete="name"></label>
+        <label class="f"><span>Email</span><input class="in" type="email" name="email" required autocomplete="username"></label>
+        <label class="f"><span>Password</span><input class="in" type="password" name="password" required minlength="8" autocomplete="new-password"><div class="help">At least 8 characters. New accounts get the Member role.</div></label>
+        <button class="btn primary" style="width:100%;padding:10px" type="submit">Create account</button>
+      </form>
+      <details class="srv"><summary>Server address</summary>
+        <label class="f" style="margin-top:8px"><input class="in" id="baseInput" placeholder="http://localhost:3000"><div class="help">Leave empty when this page is served by the API itself.</div></label>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ============ APP ============ -->
+<div id="app" class="hidden">
+  <aside>
+    <div class="brand">Taskboard</div>
+    <nav id="nav"></nav>
+    <div class="me">
+      <b id="meName"></b><span class="role" id="meRole"></span><br>
+      <button class="btn sm" id="logoutBtn">Log out</button>
+    </div>
+  </aside>
+  <main id="main"></main>
+</div>
+
+<dialog id="dlg"></dialog>
+<div id="toasts" aria-live="polite"></div>
+
+<script>
+"use strict";
+/* ---------- config ---------- */
+const STATUSES = [
+  {k:"TODO",label:"To do",c:"var(--todo)"},
+  {k:"IN_PROGRESS",label:"In progress",c:"var(--prog)"},
+  {k:"REVIEW",label:"In review",c:"var(--review)"},
+  {k:"DONE",label:"Done",c:"var(--done)"}
+];
+const SLABEL = Object.fromEntries(STATUSES.map(s=>[s.k,s.label]));
+const SCOLOR = Object.fromEntries(STATUSES.map(s=>[s.k,s.c]));
+const TRANSITIONS = {TODO:["IN_PROGRESS"],IN_PROGRESS:["TODO","REVIEW"],REVIEW:["IN_PROGRESS","DONE"],DONE:["IN_PROGRESS"]};
+const PRIORITIES = ["LOW","MEDIUM","HIGH","URGENT"];
+const PLABEL = {LOW:"Low",MEDIUM:"Medium",HIGH:"High",URGENT:"Urgent"};
+const PCOLOR = {LOW:"var(--low)",MEDIUM:"var(--med)",HIGH:"var(--high)",URGENT:"var(--urgent)"};
+const DEMO = {admin:"admin@demo.local",manager:"manager@demo.local",member:"member@demo.local"};
+
+const ICONS = {
+  board:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="10" rx="1.5"/><rect x="17" y="4" width="4" height="13" rx="1.5"/></svg>',
+  list:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>',
+  dash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
+  proj:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
+  team:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6M17 4.5a3.5 3.5 0 0 1 0 7M21.5 20c0-2.6-1.4-4.5-3.5-5.4"/></svg>'
+};
+
+/* ---------- state ---------- */
+const store = {
+  get(k){try{return localStorage.getItem(k)}catch{return null}},
+  set(k,v){try{v==null?localStorage.removeItem(k):localStorage.setItem(k,v)}catch{}}
+};
+const defaultBase = location.protocol.startsWith("http") ? "" : "http://localhost:3000"; // same origin when served by the API
+const S = {
+  base: store.get("tb.base") ?? defaultBase,
+  access: store.get("tb.access"), refresh: store.get("tb.refresh"),
+  user:null, view:"board", tasks:[], projects:[], users:new Map(),
+  f:{search:"",priority:"",status:"",mine:false},
+  list:{page:1,limit:10,sortBy:"createdAt",sortOrder:"desc",rows:[],total:0},
+  dash:null, loading:false
+};
+
+/* ---------- helpers ---------- */
+const $ = s=>document.querySelector(s);
+const esc = v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const initials = n=>String(n||"?").split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join("");
+const isStaff = ()=>S.user && (S.user.role==="ADMIN"||S.user.role==="MANAGER");
+const isAdmin = ()=>S.user && S.user.role==="ADMIN";
+const today = ()=>{const d=new Date();d.setHours(0,0,0,0);return d};
+const fmtDate = v=>{if(!v)return"";const d=new Date(v);return isNaN(d)?"":d.toLocaleDateString(undefined,{day:"numeric",month:"short",year:d.getFullYear()===new Date().getFullYear()?undefined:"numeric"})};
+const fmtTime = v=>{const d=new Date(v);return isNaN(d)?"":d.toLocaleString(undefined,{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})};
+const listOf = x=>Array.isArray(x)?x:(x&&(x.data||x.items||x.tasks||x.projects||x.rows||x.auditLogs||x.audit||x.logs))||[];
+function toast(msg,bad){
+  const t=document.createElement("div");t.className="toast"+(bad?" bad":"");t.textContent=msg;
+  $("#toasts").append(t);setTimeout(()=>t.remove(),bad?5200:2600);
+}
+
+function normTask(t){
+  const assignee=t.assignee||t.assignedTo||null;
+  const proj=t.project||null;
+  const o={
+    id:t.id,title:t.title||"",description:t.description||"",
+    status:t.status||"TODO",priority:t.priority||"MEDIUM",
+    dueDate:t.dueDate||null,
+    projectId:t.projectId??proj?.id??null,
+    projectName:proj?.name||t.projectName||"",
+    assignedToId:t.assignedToId??assignee?.id??null,
+    assigneeName:assignee?.name||t.assigneeName||"",
+    tags:(t.tags||[]).map(x=>typeof x==="string"?x:x.name).filter(Boolean),
+    createdAt:t.createdAt
+  };
+  if(o.assignedToId!=null&&o.assigneeName)S.users.set(Number(o.assignedToId),o.assigneeName);
+  return o;
+}
+const isOverdue = t=>t.dueDate && t.status!=="DONE" && new Date(t.dueDate)<today();
+const canMove = t=>isStaff()||Number(t.assignedToId)===Number(S.user?.id);
+
+/* ---------- API ---------- */
+async function raw(path,opt={},retry=true){
+  const headers={...(opt.body?{"Content-Type":"application/json"}:{})};
+  if(S.access&&!opt.anon)headers.Authorization="Bearer "+S.access;
+  let res;
+  try{res=await fetch(S.base+path,{method:opt.method||"GET",headers,body:opt.body?JSON.stringify(opt.body):undefined})}
+  catch{throw new Error("Can't reach the server at "+(S.base||location.origin)+". Check that it is running (npm run dev).")}
+  if(res.status===401&&retry&&S.refresh&&!opt.anon&&await tryRefresh())return raw(path,opt,false);
+  return res;
+}
+async function api(path,opt){
+  const res=await raw(path,opt);
+  if(res.status===204)return null;
+  const ct=res.headers.get("content-type")||"";
+  const data=ct.includes("json")?await res.json().catch(()=>null):await res.text();
+  if(!res.ok){
+    const er=data&&data.error;
+    let msg=(er&&er.message)||(typeof er==="string"&&er)||(data&&data.message)||("Request failed ("+res.status+")");
+    const d=(er&&er.details)||(data&&data.details);
+    if(Array.isArray(d)&&d.length)msg+=": "+d.map(x=>x.message||x).join("; ");
+    const e=new Error(msg);e.status=res.status;
+    if(res.status===401&&!opt?.anon)logout(true);
+    throw e;
+  }
+  return data;
+}
+let refreshing=null;
+function tryRefresh(){
+  if(refreshing)return refreshing;
+  refreshing=(async()=>{
+    try{
+      const r=await fetch(S.base+"/api/auth/refresh",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({refreshToken:S.refresh})});
+      if(!r.ok)return false;
+      saveTokens(await r.json());return true;
+    }catch{return false}finally{refreshing=null}
+  })();
+  return refreshing;
+}
+function saveTokens(d){
+  if(d.accessToken){S.access=d.accessToken;store.set("tb.access",S.access)}
+  if(d.refreshToken){S.refresh=d.refreshToken;store.set("tb.refresh",S.refresh)}
+}
+
+/* ---------- auth ---------- */
+function showAuth(msg){
+  $("#app").classList.add("hidden");$("#auth").classList.remove("hidden");
+  $("#baseInput").value=S.base;
+  authError(msg);
+}
+function authError(m){const e=$("#authErr");e.textContent=m||"";e.classList.toggle("hidden",!m)}
+function setTab(login){
+  $("#tabLogin").setAttribute("aria-selected",login);$("#tabReg").setAttribute("aria-selected",!login);
+  $("#loginForm").classList.toggle("hidden",!login);$("#regForm").classList.toggle("hidden",login);authError("");
+}
+$("#tabLogin").onclick=()=>setTab(true);$("#tabReg").onclick=()=>setTab(false);
+document.querySelectorAll("[data-demo]").forEach(b=>b.onclick=()=>{
+  const f=$("#loginForm");f.email.value=DEMO[b.dataset.demo];f.password.value="Password123!";f.requestSubmit();
+});
+$("#baseInput").onchange=e=>{S.base=e.target.value.trim().replace(/\/+$/,"");store.set("tb.base",S.base)};
+async function afterLogin(d){
+  saveTokens(d);
+  let me=d.user;
+  try{const r=await api("/api/auth/me");me=r.user||r}catch(e){if(!me)throw e}
+  S.user=me;S.users.set(Number(me.id),me.name);
+  enterApp();
+}
+$("#loginForm").onsubmit=async e=>{
+  e.preventDefault();authError("");
+  const f=e.target,btn=f.querySelector("[type=submit]");btn.disabled=true;
+  try{await afterLogin(await api("/api/auth/login",{method:"POST",anon:true,body:{email:f.email.value.trim(),password:f.password.value}}))}
+  catch(err){authError(err.message)}finally{btn.disabled=false}
+};
+$("#regForm").onsubmit=async e=>{
+  e.preventDefault();authError("");
+  const f=e.target,btn=f.querySelector("[type=submit]");btn.disabled=true;
+  try{
+    await api("/api/auth/register",{method:"POST",anon:true,body:{name:f.name.value.trim(),email:f.email.value.trim(),password:f.password.value}});
+    await afterLogin(await api("/api/auth/login",{method:"POST",anon:true,body:{email:f.email.value.trim(),password:f.password.value}}));
+    toast("Account created. Welcome!");
+  }catch(err){authError(err.message)}finally{btn.disabled=false}
+};
+async function logout(silent){
+  const rt=S.refresh;
+  if(rt&&!silent)fetch(S.base+"/api/auth/logout",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({refreshToken:rt})}).catch(()=>{});
+  S.access=S.refresh=S.user=null;store.set("tb.access",null);store.set("tb.refresh",null);
+  closeDlg();
+  showAuth(silent?"Your session expired. Log in again.":"");
+}
+$("#logoutBtn").onclick=()=>logout();
+
+/* ---------- shell ---------- */
+function enterApp(){
+  $("#auth").classList.add("hidden");$("#app").classList.remove("hidden");
+  $("#meName").textContent=S.user.name;$("#meRole").textContent=S.user.role.toLowerCase();
+  const items=[["board","Board",ICONS.board],["list","All tasks",ICONS.list],["dash","Dashboard",ICONS.dash],["proj","Projects",ICONS.proj]];
+  if(isAdmin())items.push(["team","Add user",ICONS.team]);
+  $("#nav").innerHTML=items.map(([k,l,i])=>`<button data-v="${k}">${i}${l}</button>`).join("");
+  $("#nav").onclick=e=>{const b=e.target.closest("button");if(b)go(b.dataset.v)};
+  S.view=location.hash.slice(1)||"board";
+  if(!items.some(i=>i[0]===S.view))S.view="board";
+  go(S.view);
+}
+async function go(v){
+  S.view=v;history.replaceState(null,"","#"+v);
+  document.querySelectorAll("#nav button").forEach(b=>b.toggleAttribute("aria-current",b.dataset.v===v)||b.removeAttribute("aria-current"));
+  document.querySelectorAll("#nav button").forEach(b=>{if(b.dataset.v===v)b.setAttribute("aria-current","page")});
+  $("#main").innerHTML='<p class="muted">Loading…</p>';
+  try{
+    if(v==="board")await loadBoard();
+    else if(v==="list")await loadList();
+    else if(v==="dash")await loadDash();
+    else if(v==="proj")await loadProjects();
+    else if(v==="team")renderTeam();
+  }catch(e){if(e.status!==401){$("#main").innerHTML=`<div class="err">${esc(e.message)}</div><button class="btn" onclick="go(S.view)">Try again</button>`}}
+}
+async function ensureProjects(){
+  try{S.projects=listOf(await api("/api/projects"))}catch{S.projects=[]}
+}
+
+/* ---------- board ---------- */
+async function fetchAllTasks(){
+  let r;
+  try{r=await api("/api/tasks?limit=100&sortBy=createdAt&sortOrder=desc")}
+  catch(e){if(e.status===400)r=await api("/api/tasks?limit=50");else throw e}
+  S.tasks=listOf(r).map(normTask);
+}
+async function loadBoard(){await Promise.all([fetchAllTasks(),ensureProjects()]);renderBoard()}
+function filtered(){
+  const q=S.f.search.trim().toLowerCase();
+  return S.tasks.filter(t=>
+    (!S.f.priority||t.priority===S.f.priority)&&
+    (!S.f.mine||Number(t.assignedToId)===Number(S.user.id))&&
+    (!q||(t.title+" "+t.description+" "+t.tags.join(" ")+" "+t.assigneeName).toLowerCase().includes(q)));
+}
+function filterBar(opts={}){
+  return `<div class="filters">
+    <input class="in" type="search" id="fSearch" placeholder="Search tasks" value="${esc(S.f.search)}" aria-label="Search tasks">
+    ${opts.status?`<select class="in" id="fStatus" aria-label="Status"><option value="">Any status</option>${STATUSES.map(s=>`<option value="${s.k}" ${S.f.status===s.k?"selected":""}>${s.label}</option>`).join("")}</select>`:""}
+    <select class="in" id="fPri" aria-label="Priority"><option value="">Any priority</option>${PRIORITIES.map(p=>`<option value="${p}" ${S.f.priority===p?"selected":""}>${PLABEL[p]}</option>`).join("")}</select>
+    ${opts.mine?`<label class="tog"><input type="checkbox" id="fMine" ${S.f.mine?"checked":""}> Assigned to me</label>`:""}
+  </div>`;
+}
+function bindFilters(rerender,debounce){
+  let tm;
+  const s=$("#fSearch");
+  s.oninput=()=>{S.f.search=s.value;clearTimeout(tm);tm=setTimeout(()=>{rerender();const n=$("#fSearch");n.focus();n.setSelectionRange(n.value.length,n.value.length)},debounce?350:120)};
+  $("#fPri").onchange=e=>{S.f.priority=e.target.value;rerender()};
+  const st=$("#fStatus");if(st)st.onchange=e=>{S.f.status=e.target.value;rerender()};
+  const m=$("#fMine");if(m)m.onchange=e=>{S.f.mine=e.target.checked;rerender()};
+}
+function cardHTML(t){
+  const lock=!canMove(t);
+  return `<button class="card ${lock?"lock":""}" draggable="${!lock}" data-id="${t.id}" style="--pc:${PCOLOR[t.priority]||"var(--line)"}">
+    <h3>${esc(t.title)}</h3>
+    <div class="meta">
+      <span class="pri ${t.priority}">${PLABEL[t.priority]||t.priority}</span>
+      ${t.dueDate?`<span class="due ${isOverdue(t)?"over":""}">${isOverdue(t)?"Overdue · ":"Due "}${fmtDate(t.dueDate)}</span>`:""}
+      ${t.projectName?`<span>${esc(t.projectName)}</span>`:""}
+      ${t.tags.map(x=>`<span class="tag">${esc(x)}</span>`).join("")}
+      ${t.assigneeName?`<span class="av" title="${esc(t.assigneeName)}">${esc(initials(t.assigneeName))}</span>`:""}
+    </div></button>`;
+}
+function renderBoard(){
+  const list=filtered();
+  $("#main").innerHTML=`
+    <div class="topbar"><h2>Board</h2><button class="btn primary" id="newTask">New task</button></div>
+    ${filterBar({mine:true})}
+    <div class="board" id="board">${STATUSES.map(s=>{
+      const ts=list.filter(t=>t.status===s.k);
+      return `<section class="col" data-status="${s.k}" aria-label="${s.label}">
+        <header><i style="background:${s.c}"></i>${s.label}<span class="n">${ts.length}</span></header>
+        <div class="cards">${ts.map(cardHTML).join("")||`<div class="empty">${s.k==="TODO"?"Nothing queued. Add a task to get started.":"Drop a task here"}</div>`}</div>
+      </section>`}).join("")}</div>`;
+  $("#newTask").onclick=()=>openTask();
+  bindFilters(renderBoard);
+  bindDnD();
+}
+function bindDnD(){
+  const board=$("#board");let dragId=null;
+  board.onclick=e=>{const c=e.target.closest(".card");if(c)openTask(Number(c.dataset.id))};
+  board.ondragstart=e=>{
+    const c=e.target.closest(".card");if(!c)return;
+    dragId=Number(c.dataset.id);e.dataTransfer.setData("text/plain",String(dragId));e.dataTransfer.effectAllowed="move";
+    const t=S.tasks.find(x=>x.id===dragId);
+    board.classList.add("dragging");
+    board.querySelectorAll(".col").forEach(col=>{
+      const ok=TRANSITIONS[t.status].includes(col.dataset.status);
+      col.classList.toggle("can",ok);col.classList.toggle("cant",!ok&&col.dataset.status!==t.status);
+    });
+  };
+  board.ondragend=()=>{dragId=null;board.classList.remove("dragging");board.querySelectorAll(".col").forEach(c=>c.classList.remove("can","cant"))};
+  board.ondragover=e=>{const col=e.target.closest(".col");if(col&&col.classList.contains("can")){e.preventDefault();e.dataTransfer.dropEffect="move"}};
+  board.ondrop=async e=>{
+    const col=e.target.closest(".col");if(!col||!col.classList.contains("can"))return;
+    e.preventDefault();
+    const t=S.tasks.find(x=>x.id===dragId);if(!t)return;
+    await moveTask(t,col.dataset.status);
+  };
+}
+async function moveTask(t,status){
+  const prev=t.status;t.status=status;
+  if(S.view==="board")renderBoard();
+  try{
+    await api("/api/tasks/"+t.id,{method:"PATCH",body:{status}});
+    toast(`Moved to ${SLABEL[status]}`);
+  }catch(err){
+    t.status=prev;toast(err.message,true);
+  }
+  if(S.view==="board")renderBoard();
+}
+
+/* ---------- list ---------- */
+async function loadList(){await ensureProjects();await fetchList()}
+async function fetchList(){
+  const L=S.list;
+  const q=new URLSearchParams({page:L.page,limit:L.limit,sortBy:L.sortBy,sortOrder:L.sortOrder});
+  if(S.f.status)q.set("status",S.f.status);
+  if(S.f.priority)q.set("priority",S.f.priority);
+  if(S.f.search.trim())q.set("search",S.f.search.trim());
+  if(S.f.mine)q.set("assignedToId",S.user.id);
+  const r=await api("/api/tasks?"+q);
+  L.rows=listOf(r).map(normTask);
+  L.total=Number(r.total??L.rows.length);
+  renderList();
+}
+function renderList(){
+  const L=S.list,pages=Math.max(1,Math.ceil(L.total/L.limit));
+  const th=(k,label)=>`<th aria-sort="${L.sortBy===k?(L.sortOrder==="asc"?"ascending":"descending"):"none"}"><button data-sort="${k}">${label}${L.sortBy===k?(L.sortOrder==="asc"?" ↑":" ↓"):""}</button></th>`;
+  $("#main").innerHTML=`
+    <div class="topbar"><h2>All tasks</h2><button class="btn primary" id="newTask">New task</button></div>
+    ${filterBar({status:true,mine:true})}
+    <div class="tw"><table>
+      <thead><tr>${th("title","Task")}${th("status","Status")}${th("priority","Priority")}${th("dueDate","Due")}<th>Assignee</th></tr></thead>
+      <tbody>${L.rows.map(t=>`<tr data-id="${t.id}">
+        <td><b>${esc(t.title)}</b>${t.tags.length?" "+t.tags.map(x=>`<span class="tag">${esc(x)}</span>`).join(" "):""}</td>
+        <td><span class="st" style="--c:${SCOLOR[t.status]}"><i></i>${SLABEL[t.status]||t.status}</span></td>
+        <td><span class="pri ${t.priority}">${PLABEL[t.priority]||t.priority}</span></td>
+        <td class="${isOverdue(t)?"due over":""}">${fmtDate(t.dueDate)||"—"}</td>
+        <td>${esc(t.assigneeName)||'<span class="muted">Unassigned</span>'}</td></tr>`).join("")||`<tr><td colspan="5"><div class="empty" style="border:0">No tasks match these filters.</div></td></tr>`}</tbody>
+    </table></div>
+    <div class="pager"><span class="muted">${L.total} task${L.total===1?"":"s"}</span>
+      <button class="btn sm" id="prev" ${L.page<=1?"disabled":""}>Previous</button>
+      <span>Page ${L.page} of ${pages}</span>
+      <button class="btn sm" id="next" ${L.page>=pages?"disabled":""}>Next</button></div>`;
+  $("#newTask").onclick=()=>openTask();
+  bindFilters(()=>{L.page=1;fetchList().catch(e=>toast(e.message,true))},true);
+  document.querySelectorAll("[data-sort]").forEach(b=>b.onclick=()=>{
+    const k=b.dataset.sort;
+    if(L.sortBy===k)L.sortOrder=L.sortOrder==="asc"?"desc":"asc";else{L.sortBy=k;L.sortOrder="asc"}
+    L.page=1;fetchList().catch(e=>toast(e.message,true));
+  });
+  document.querySelectorAll("tbody tr[data-id]").forEach(r=>r.onclick=()=>openTask(Number(r.dataset.id),L.rows));
+  $("#prev").onclick=()=>{L.page--;fetchList().catch(e=>toast(e.message,true))};
+  $("#next").onclick=()=>{L.page++;fetchList().catch(e=>toast(e.message,true))};
+}
+
+/* ---------- task dialog ---------- */
+const dlg=$("#dlg");
+function closeDlg(){if(dlg.open)dlg.close()}
+dlg.addEventListener("click",e=>{if(e.target===dlg)dlg.close()});
+async function openTask(id,pool){
+  let t=null;
+  if(id!=null){
+    t=(pool||S.tasks).find(x=>x.id===id)||null;
+    try{t=normTask((r=>r.task||r.data||r)(await api("/api/tasks/"+id)))}catch(e){if(!t){toast(e.message,true);return}}
+  }
+  if(!S.projects.length)await ensureProjects();
+  renderTaskDlg(t);
+  if(!dlg.open)dlg.showModal();
+  if(t)loadAudit(t.id);
+}
+function renderTaskDlg(t){
+  const edit=!!t,staff=isStaff();
+  const mine=!edit||Number(t.assignedToId)===Number(S.user.id);
+  const editable=!edit||staff||mine;
+  const next=edit?TRANSITIONS[t.status]||[]:[];
+  const users=[...S.users.entries()];
+  dlg.innerHTML=`<form class="dlg" id="taskForm">
+    <h2>${edit?"Task #"+t.id:"New task"}</h2>
+    ${edit?`<div class="allowed"><span class="st" style="--c:${SCOLOR[t.status]}"><i></i>${SLABEL[t.status]||t.status}</span>
+      ${editable&&next.length?`<span class="muted">Move to</span>${next.map(n=>`<button type="button" class="btn sm" data-move="${n}">${SLABEL[n]}</button>`).join("")}`:""}</div>`:""}
+    <label class="f"><span>Title</span><input class="in" name="title" required minlength="2" maxlength="200" value="${esc(t?.title)}" ${editable?"":"disabled"}></label>
+    <label class="f"><span>Description</span><textarea class="in" name="description" ${editable?"":"disabled"}>${esc(t?.description)}</textarea></label>
+    <div class="row">
+      <label class="f"><span>Priority</span><select class="in" name="priority" ${editable?"":"disabled"}>${PRIORITIES.map(p=>`<option value="${p}" ${(t?.priority||"MEDIUM")===p?"selected":""}>${PLABEL[p]}</option>`).join("")}</select></label>
+      <label class="f"><span>Due date</span><input class="in" type="date" name="dueDate" value="${t?.dueDate?esc(String(t.dueDate).slice(0,10)):""}" ${editable?"":"disabled"}></label>
+    </div>
+    <div class="row">
+      <label class="f"><span>Project</span><select class="in" name="projectId" ${editable?"":"disabled"}><option value="">No project</option>${S.projects.map(p=>`<option value="${p.id}" ${Number(t?.projectId)===p.id?"selected":""}>${esc(p.name)}</option>`).join("")}</select></label>
+      ${staff?`<label class="f"><span>Assign to (user ID)</span><input class="in" type="number" min="1" name="assignedToId" list="ulist" value="${t?.assignedToId??""}" placeholder="Unassigned"><datalist id="ulist">${users.map(([i,n])=>`<option value="${i}">${esc(n)}</option>`).join("")}</datalist>${t?.assigneeName?`<div class="help">Currently ${esc(t.assigneeName)}</div>`:""}</label>`
+        :`<label class="f"><span>Assignee</span><input class="in" disabled value="${esc(edit?(t.assigneeName||"Unassigned"):S.user.name+" (you)")}"><div class="help">Members can only work on tasks assigned to themselves.</div></label>`}
+    </div>
+    <label class="f"><span>Tags</span><input class="in" name="tags" value="${esc(t?.tags.join(", "))}" placeholder="backend, urgent" ${editable?"":"disabled"}><div class="help">Separate with commas.</div></label>
+    <div id="dlgErr" class="err hidden" role="alert"></div>
+    <div class="acts2">
+      ${editable?`<button class="btn primary" type="submit">${edit?"Save changes":"Create task"}</button>`:""}
+      <button class="btn" type="button" id="closeDlg">${editable?"Cancel":"Close"}</button>
+      ${edit&&isAdmin()?`<button class="btn danger sp" type="button" id="delTask">Delete task</button>`:""}
+    </div>
+    ${edit?`<div class="audit"><h3 style="font-size:17px">History</h3><ol id="auditList"><li class="muted">Loading…</li></ol></div>`:""}
+  </form>`;
+  $("#closeDlg").onclick=closeDlg;
+  const err=m=>{const e=$("#dlgErr");e.textContent=m||"";e.classList.toggle("hidden",!m)};
+  dlg.querySelectorAll("[data-move]").forEach(b=>b.onclick=async()=>{
+    try{
+      await api("/api/tasks/"+t.id,{method:"PATCH",body:{status:b.dataset.move}});
+      toast("Moved to "+SLABEL[b.dataset.move]);closeDlg();refreshView();
+    }catch(e){err(e.message)}
+  });
+  if(edit&&isAdmin())$("#delTask").onclick=async()=>{
+    if(!confirm(`Delete "${t.title}"? This also removes its history.`))return;
+    try{await api("/api/tasks/"+t.id,{method:"DELETE"});toast("Task deleted");closeDlg();refreshView()}catch(e){err(e.message)}
+  };
+  $("#taskForm").onsubmit=async e=>{
+    e.preventDefault();err("");
+    const f=e.target,body={};
+    const tags=f.tags.value.split(",").map(s=>s.trim()).filter(Boolean);
+    if(!edit){
+      body.title=f.title.value.trim();body.priority=f.priority.value;
+      if(f.description.value.trim())body.description=f.description.value.trim();
+      if(f.dueDate.value)body.dueDate=f.dueDate.value;
+      if(f.projectId.value)body.projectId=Number(f.projectId.value);
+      if(staff){if(f.assignedToId.value)body.assignedToId=Number(f.assignedToId.value)}else body.assignedToId=S.user.id;
+      if(tags.length)body.tags=tags;
+    }else{
+      if(f.title.value.trim()!==t.title)body.title=f.title.value.trim();
+      if(f.description.value.trim()!==t.description)body.description=f.description.value.trim();
+      if(f.priority.value!==t.priority)body.priority=f.priority.value;
+      const due=f.dueDate.value||null,oldDue=t.dueDate?String(t.dueDate).slice(0,10):null;
+      if(due!==oldDue)body.dueDate=due;
+      const pj=f.projectId.value?Number(f.projectId.value):null;
+      if(pj!==(t.projectId??null))body.projectId=pj;
+      if(staff){const a=f.assignedToId.value?Number(f.assignedToId.value):null;if(a!==(t.assignedToId==null?null:Number(t.assignedToId)))body.assignedToId=a}
+      if(tags.join("|")!==t.tags.join("|"))body.tags=tags;
+      if(!Object.keys(body).length){closeDlg();return}
+    }
+    const btn=f.querySelector("[type=submit]");btn.disabled=true;
+    try{
+      await api(edit?"/api/tasks/"+t.id:"/api/tasks",{method:edit?"PATCH":"POST",body});
+      toast(edit?"Changes saved":"Task created");closeDlg();refreshView();
+    }catch(e){err(e.message);btn.disabled=false}
+  };
+}
+async function loadAudit(id){
+  const ol=$("#auditList");if(!ol)return;
+  try{
+    const rows=listOf(await api(`/api/tasks/${id}/audit`));
+    ol.innerHTML=rows.length?rows.map(a=>{
+      const who=a.user?.name||a.userName||S.users.get(Number(a.userId))||("User "+a.userId);
+      const fmt=(v,f)=>{
+        if(v==null||v==="")return "empty";
+        if(f==="assignedToId")return S.users.get(Number(v))||("user "+v);
+        if(f==="projectId"){const p=S.projects.find(x=>x.id===Number(v));return p?p.name:"project "+v}
+        if(f==="dueDate")return fmtDate(v)||v;
+        return PLABEL[v]||SLABEL[v]||v;
+      };
+      const name={assignedToId:"assignee",projectId:"project",dueDate:"due date"}[a.field]||a.field;
+      const what=a.field==="created"?`created this task`:`changed ${esc(name)} <s>${esc(fmt(a.oldValue,a.field))}</s> to <b>${esc(fmt(a.newValue,a.field))}</b>`;
+      return `<li><b>${esc(who)}</b> ${what}<br><span class="muted">${fmtTime(a.createdAt)}</span></li>`;
+    }).join(""):'<li class="muted">No changes recorded yet.</li>';
+  }catch(e){ol.innerHTML=`<li class="muted">${esc(e.message)}</li>`}
+}
+function refreshView(){go(S.view)}
+
+/* ---------- dashboard ---------- */
+const pairs=(x,keys)=>{
+  if(!x)return null;
+  if(Array.isArray(x))return Object.fromEntries(x.map(r=>[r[keys[0]]||r.key||r.name||r.label,Number(r.count??r.total??r.value??0)]));
+  return Object.fromEntries(Object.entries(x).map(([k,v])=>[k,Number(typeof v==="object"?(v.count??v.total):v)]));
+};
+async function loadDash(){
+  const [d]=await Promise.all([api("/api/dashboard"),fetchAllTasks()]);
+  const o=d.data||d.dashboard||d;
+  let byStatus=pairs(o.byStatus||o.statusCounts||o.status,["status"]);
+  let byPri=pairs(o.byPriority||o.priorityCounts||o.priority,["priority"]);
+  const count=(k,v)=>S.tasks.filter(t=>t[k]===v).length;
+  byStatus=byStatus||Object.fromEntries(STATUSES.map(s=>[s.k,count("status",s.k)]));
+  byPri=byPri||Object.fromEntries(PRIORITIES.map(p=>[p,count("priority",p)]));
+  const total=Number(typeof o.totals==="object"&&o.totals?(o.totals.total??o.totals.tasks):(o.totals??o.total??o.totalTasks))||Object.values(byStatus).reduce((a,b)=>a+b,0);
+  const overdue=Number(o.overdue??o.overdueCount??o.overdueTasks)||S.tasks.filter(isOverdue).length;
+  S.dash={byStatus,byPri,total,overdue};
+  renderDash();
+}
+function renderDash(){
+  const {byStatus,byPri,total,overdue}=S.dash;
+  const sum=Math.max(1,STATUSES.reduce((a,s)=>a+(byStatus[s.k]||0),0));
+  const maxP=Math.max(1,...PRIORITIES.map(p=>byPri[p]||0));
+  $("#main").innerHTML=`
+    <div class="topbar"><h2>Dashboard</h2><button class="btn" id="exportCsv">Download team report (CSV)</button></div>
+    <div class="panel">
+      <h3>${total} task${total===1?"":"s"} across the team</h3>
+      <div class="stack" role="img" aria-label="Tasks by status">${STATUSES.map(s=>`<div style="--c:${s.c};flex:${byStatus[s.k]||0}" title="${s.label}: ${byStatus[s.k]||0}"></div>`).join("")}</div>
+      <div class="legend">${STATUSES.map(s=>`<span><b style="color:${s.c}">${byStatus[s.k]||0}</b>${s.label}</span>`).join("")}</div>
+    </div>
+    <div class="two">
+      <div class="panel"><h3>By priority</h3><div class="bars">${PRIORITIES.slice().reverse().map(p=>`<div class="bar" style="--c:${PCOLOR[p]}"><span>${PLABEL[p]}</span><div><i style="width:${(byPri[p]||0)/maxP*100}%"></i></div><b>${byPri[p]||0}</b></div>`).join("")}</div></div>
+      <div class="panel"><h3>Overdue</h3><div class="big" style="margin:14px 0 6px;color:${overdue?"var(--danger)":"var(--done)"}">${overdue}</div>
+        <p class="muted" style="margin:0">${overdue?"Open tasks past their due date.":"Nothing is past its due date."}</p></div>
+    </div>`;
+  $("#exportCsv").onclick=async()=>{
+    try{
+      const res=await raw("/api/dashboard/export?format=csv");
+      if(!res.ok)throw new Error("Export failed ("+res.status+")");
+      const url=URL.createObjectURL(await res.blob());
+      const a=document.createElement("a");a.href=url;a.download="team-report.csv";document.body.append(a);a.click();a.remove();URL.revokeObjectURL(url);
+      toast("Report downloaded");
+    }catch(e){toast(e.message,true)}
+  };
+}
+
+/* ---------- projects ---------- */
+async function loadProjects(){await ensureProjects();renderProjects()}
+function renderProjects(){
+  $("#main").innerHTML=`
+    <div class="topbar"><h2>Projects</h2>${isStaff()?'<button class="btn primary" id="newProj">New project</button>':""}</div>
+    <div class="grid">${S.projects.map(p=>`<div class="pj"><h3>${esc(p.name)}</h3>
+      <p class="muted" style="margin:0">${esc(p.description)||"No description."}</p>
+      <div class="acts"><button class="btn sm" data-filter="${p.id}">View tasks</button>${isAdmin()?`<button class="btn sm danger" data-del="${p.id}">Delete</button>`:""}</div></div>`).join("")}</div>
+    ${S.projects.length?"":`<div class="empty">No projects yet.${isStaff()?" Create one to group related tasks.":" A manager can create one."}</div>`}`;
+  const np=$("#newProj");if(np)np.onclick=projectDialog;
+  document.querySelectorAll("[data-filter]").forEach(b=>b.onclick=()=>{
+    const id=Number(b.dataset.filter),p=S.projects.find(x=>x.id===id);
+    S.f.search=p?p.name:"";go("board");
+  });
+  document.querySelectorAll("[data-del]").forEach(b=>b.onclick=async()=>{
+    const p=S.projects.find(x=>x.id===Number(b.dataset.del));
+    if(!confirm(`Delete project "${p.name}"?`))return;
+    try{await api("/api/projects/"+p.id,{method:"DELETE"});toast("Project deleted");loadProjects()}catch(e){toast(e.message,true)}
+  });
+}
+function projectDialog(){
+  dlg.innerHTML=`<form class="dlg" id="pForm"><h2>New project</h2>
+    <label class="f"><span>Name</span><input class="in" name="name" required maxlength="120"></label>
+    <label class="f"><span>Description</span><textarea class="in" name="description"></textarea></label>
+    <div id="dlgErr" class="err hidden" role="alert"></div>
+    <div class="acts2"><button class="btn primary" type="submit">Create project</button><button class="btn" type="button" id="closeDlg">Cancel</button></div></form>`;
+  $("#closeDlg").onclick=closeDlg;
+  $("#pForm").onsubmit=async e=>{
+    e.preventDefault();const f=e.target;
+    const body={name:f.name.value.trim()};if(f.description.value.trim())body.description=f.description.value.trim();
+    try{await api("/api/projects",{method:"POST",body});toast("Project created");closeDlg();loadProjects()}
+    catch(err){const x=$("#dlgErr");x.textContent=err.message;x.classList.remove("hidden")}
+  };
+  dlg.showModal();
+}
+
+/* ---------- team (admin) ---------- */
+function renderTeam(){
+  $("#main").innerHTML=`<div class="topbar"><h2>Add user</h2></div>
+    <form class="panel formpanel" id="uForm">
+      <p class="muted" style="margin-top:0">Create an account with any role. People can also sign up themselves as Members.</p>
+      <label class="f"><span>Name</span><input class="in" name="name" required minlength="2"></label>
+      <label class="f"><span>Email</span><input class="in" type="email" name="email" required></label>
+      <label class="f"><span>Temporary password</span><input class="in" type="password" name="password" required minlength="8" autocomplete="new-password"></label>
+      <label class="f"><span>Role</span><select class="in" name="role"><option value="MEMBER">Member</option><option value="MANAGER">Manager</option><option value="ADMIN">Admin</option></select></label>
+      <div id="uErr" class="err hidden" role="alert"></div>
+      <button class="btn primary" type="submit">Create user</button>
+    </form>`;
+  $("#uForm").onsubmit=async e=>{
+    e.preventDefault();const f=e.target;
+    try{
+      const r=await api("/api/auth/users",{method:"POST",body:{name:f.name.value.trim(),email:f.email.value.trim(),password:f.password.value,role:f.role.value}});
+      const u=r.user||r;if(u&&u.id)S.users.set(Number(u.id),u.name);
+      toast(`${f.name.value.trim()} added${u&&u.id?" (user ID "+u.id+")":""}`);f.reset();$("#uErr").classList.add("hidden");
+    }catch(err){const x=$("#uErr");x.textContent=err.message;x.classList.remove("hidden")}
+  };
+}
+
+/* ---------- boot ---------- */
+(async function init(){
+  if(!S.access){showAuth();return}
+  try{
+    const r=await api("/api/auth/me");
+    S.user=r.user||r;S.users.set(Number(S.user.id),S.user.name);enterApp();
+  }catch(e){if(e.status!==401)showAuth(e.message)}
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,815 @@
+================================================================================
+P8 - ASYNCHRONOUS TASK MANAGER API
+DETAILED INSTRUCTIONS - FROM SCRATCH, HOW TO RUN IT
+================================================================================
+
+Project: Task Manager API (P8 from the BEE Node.js project list)
+Delivered zip: Task_Manager_API_P8.zip
+What it is: A working REST API built with Node.js + Express, in MVC style.
+  - User registration with bcrypt password hashing and JWT login
+  - Refresh-token rotation (old refresh token stops working after use)
+  - Role-based access: Admin, Manager, Member
+  - Task CRUD with priority, due dates, tags, and validated status changes
+  - Task assignment, Joi validation, central error handling
+  - Pagination, sorting and filtering on the task list
+  - Audit log for every task change
+  - Productivity dashboard and CSV team-report export
+  - Jest tests
+
+Stack used in the delivered code:
+  Node.js + Express, Node's built-in SQLite (no separate database to install),
+  Joi, bcryptjs, jsonwebtoken, Nodemailer (optional).
+  A Prisma schema file (prisma/schema.prisma) is also included in the zip as
+  the reference data model for the P8 Prisma stage. The running code uses
+  Node's built-in SQLite with identical tables, so that npm install works
+  with no engine download and no MySQL setup.
+
+================================================================================
+SECTION 0 - WHAT YOU NEED BEFORE YOU START
+================================================================================
+
+1. A computer with Windows, Mac, or Linux.
+2. Node.js version 22.5 or newer. Node 24 LTS is recommended.
+   - This gives you both "node" and "npm" commands.
+   - Download it from https://nodejs.org - choose the LTS version.
+   - After installing, CLOSE your terminal completely and open a new one,
+     otherwise the new commands may still say "not recognised".
+   - Then check, in the new terminal:
+       node --version
+       npm --version
+     Both should print a version number. If either one fails, Node is not
+     installed correctly yet, or the terminal was not reopened.
+3. No MySQL, no Docker, no other database is needed.
+   The project uses a local SQLite file (dev.db in the project folder)
+   that is created automatically for you.
+4. A terminal, and optionally Postman for testing the API.
+   The examples in this file use PowerShell on Windows and curl on
+   Mac/Linux. Both are given for every test step.
+
+================================================================================
+SECTION 1 - UNZIP AND ENTER THE PROJECT
+================================================================================
+
+1. Unzip Task_Manager_API_P8.zip anywhere you like, for example:
+     Windows:   Z:\Myself\Projects\Task_Manager_API_P8\
+     Mac/Linux: ~/Projects/Task_Manager_API_P8/
+2. Open a terminal INSIDE that folder:
+     Windows: In File Explorer, open the folder, click the address bar,
+              type  powershell  and press Enter.
+     Mac:     Right-click the folder, then "New Terminal at Folder".
+     Linux:   Right-click the folder, then "Open in Terminal".
+3. From now on, every command in this file runs in that folder.
+   If a command says "file not found" or "package.json not found", you are
+   almost certainly in the wrong folder. Check with:
+     Windows PowerShell: Get-Location
+     Mac/Linux:          pwd
+   You should see the project folder name at the end of the path.
+
+================================================================================
+SECTION 2 - INSTALL DEPENDENCIES (ONE TIME ONLY)
+================================================================================
+
+Run this command in the project folder:
+
+  npm install
+
+What this does, in plain words:
+  It downloads the libraries listed in package.json (Express, bcrypt, JWT,
+  Joi, Nodemailer, and the test tools) into a folder called node_modules.
+  It can take a minute the first time. Do not interrupt it, and do not run
+  it again unless you delete node_modules.
+
+If npm install fails with a network error, check your internet connection
+and run it again. Do NOT run it inside node_modules, and do NOT run it
+from a different folder.
+
+================================================================================
+SECTION 3 - CREATE YOUR .env FILE (ONE TIME ONLY)
+================================================================================
+
+Windows PowerShell:
+
+  Copy-Item .env.example .env
+
+Mac / Linux:
+
+  cp .env.example .env
+
+This creates a file called exactly ".env" (with a dot at the start, and
+no .txt at the end) next to package.json.
+
+Open .env in any text editor (Notepad, VS Code, etc.) and change these
+two lines to long random strings. Any random text works, just do not
+leave the example values in a real deployment:
+
+  JWT_SECRET=change-this-access-secret-to-a-long-random-string
+  JWT_REFRESH_SECRET=change-this-refresh-secret-to-a-different-long-random-string
+
+For example, you could change them to:
+
+  JWT_SECRET=my-first-secret-9f3k7d2s8q1w4e6r
+  JWT_REFRESH_SECRET=my-second-secret-5t8y2u6i9o3p1a7s
+
+Leave this line as it is:
+
+  DATABASE_URL="file:./dev.db"
+
+Leave the SMTP lines empty unless you want real emails. Without SMTP,
+assignment emails are printed to the server console instead of being
+sent, which is fine for a demo and for college submission.
+
+To send real emails later, fill in SMTP_HOST, SMTP_PORT, SMTP_USER and
+SMTP_PASS. For Gmail, use an App Password, NOT your normal Gmail password.
+To create a Gmail App Password, you need 2-Step Verification turned on
+in your Google account, then generate an App Password for "Mail".
+
+Do NOT commit .env to git, and do NOT share it. It is already in
+.gitignore, so git will ignore it.
+
+================================================================================
+SECTION 4 - CREATE THE DATABASE AND SEED DEMO DATA (ONE TIME ONLY)
+================================================================================
+
+Run this command in the project folder:
+
+  npm run setup
+
+What this does, in plain words:
+  It creates the database tables (users, projects, tasks, tags, audit_log,
+  refresh_tokens) in a file called dev.db, then inserts demo users, one
+  demo project, and two demo tasks.
+
+Demo logins - all three use the same password:
+
+  Role     Email               Password
+  -------  ------------------  ------------
+  Admin    admin@demo.local    Password123!
+  Manager  manager@demo.local  Password123!
+  Member   member@demo.local   Password123!
+
+Important notes about the demo users:
+  - These are demo accounts with a publicly known password. Change their
+    passwords, or delete them, before using this project for anything real.
+  - If you run "npm run setup" again later, it will NOT duplicate the
+    seed users. It checks if they already exist and skips them.
+  - The seed project is called "Website Relaunch". The two seed tasks are
+    "Build the login API" (IN_PROGRESS, HIGH priority) and
+    "Write the README" (TODO, MEDIUM priority), both assigned to the
+    demo Member (Ravi Member).
+
+If npm run setup fails with "DATABASE_URL not found", you skipped
+Section 3. Make sure a file named exactly ".env" exists in the project
+folder, next to package.json, and that it is not named ".env.txt".
+Windows Notepad sometimes adds .txt - if that happened, rename the file
+to just ".env".
+
+================================================================================
+SECTION 5 - START THE SERVER
+================================================================================
+
+Run this command in the project folder:
+
+  npm run dev
+
+You should see exactly this in the terminal:
+
+  Task Manager API listening on http://localhost:3000
+  Health check: http://localhost:3000/health
+
+Keep this terminal window OPEN. The server runs there. If you close it,
+the server stops.
+
+Open a SECOND terminal window (in the same project folder) for the test
+commands in Section 6, or use Postman instead.
+
+To stop the server later, go back to the server window and press
+Ctrl + C.
+
+Health check - in the second terminal, or in Postman, or in a browser:
+
+  Windows PowerShell:
+    Invoke-RestMethod http://localhost:3000/health
+
+  Mac / Linux:
+    curl http://localhost:3000/health
+
+Expected reply:
+
+  {"status":"ok","service":"task-manager-api"}
+
+If you open http://localhost:3000/health in a browser, you will see the
+same JSON text. That only proves the server is up - it does not prove
+login or tasks work. Use Section 6 for that.
+
+--------------------------------------------------------------------------------
+WINDOWS WARNING - PLEASE READ THIS
+--------------------------------------------------------------------------------
+In PowerShell, the word "curl" is NOT real curl. It is an alias for
+Invoke-WebRequest, and it behaves differently. That is why every example
+in this file gives you two versions: Invoke-RestMethod for Windows, and
+curl for Mac/Linux.
+
+If you are on Windows, always use Invoke-RestMethod as shown below.
+If you really want real curl on Windows, type "curl.exe" (with .exe),
+not just "curl".
+
+The most common mistake in this project is copying a curl example into
+PowerShell and getting a confusing error. Use the PowerShell version.
+
+================================================================================
+SECTION 6 - TRY IT END TO END (COPY-PASTE)
+================================================================================
+
+Do these steps in order, in the second terminal window, while the server
+is still running in the first window.
+
+----------------------------------------
+6a. Log in as the demo manager and save the token
+----------------------------------------
+
+Windows PowerShell:
+
+  $login = Invoke-RestMethod -Method Post -Uri http://localhost:3000/api/auth/login `
+    -ContentType "application/json" `
+    -Body '{"email":"manager@demo.local","password":"Password123!"}'
+  $token = $login.accessToken
+  $token
+
+Mac / Linux:
+
+  TOKEN=$(curl -s -X POST http://localhost:3000/api/auth/login \
+    -H "Content-Type: application/json" \
+    -d '{"email":"manager@demo.local","password":"Password123!"}' \
+    | python3 -c "import sys,json; print(json.load(sys.stdin)['accessToken'])")
+  echo $TOKEN
+
+What you get back:
+  - user: your profile (id, name, email, role)
+  - accessToken: a long string starting with "eyJ". This is what you
+    send in the Authorization header for every other request.
+  - refreshToken: a second long string, used only to get a new access
+    token when the first one expires (see Section 7, refresh endpoint).
+
+Access tokens last 15 minutes BY DESIGN. If a request later returns
+"Access token is invalid or expired", that is normal - log in again
+for a fresh token, or use the refresh endpoint in Section 7. It does
+NOT mean the project is broken.
+
+In PowerShell, the variable $token only exists in that one PowerShell
+window. If you close that window, you must log in again and save the
+token again. The same applies to $TOKEN on Mac/Linux.
+
+----------------------------------------
+6b. List tasks
+----------------------------------------
+
+Windows PowerShell:
+
+  Invoke-RestMethod -Uri http://localhost:3000/api/tasks `
+    -Headers @{ Authorization = "Bearer $token" }
+
+Mac / Linux:
+
+  curl -s http://localhost:3000/api/tasks -H "Authorization: Bearer $TOKEN"
+
+Expected: a JSON object with data (a list of tasks), page, limit, total
+and totalPages. With the seed data only, total should be 2.
+
+If you get "Missing or invalid Authorization header" (401), you forgot
+the header, or $token / $TOKEN is empty. Log in again (Section 6a) and
+check that the token printed out is a long string starting with eyJ.
+
+----------------------------------------
+6c. Create a task (manager assigning it to the demo member, id 3)
+----------------------------------------
+
+The demo users have these ids after seeding:
+  1 = Asha Admin (admin@demo.local)
+  2 = Meera Manager (manager@demo.local)
+  3 = Ravi Member (member@demo.local)
+
+So assignedToId 3 means "assign to Ravi Member".
+
+Windows PowerShell:
+
+  Invoke-RestMethod -Method Post -Uri http://localhost:3000/api/tasks `
+    -ContentType "application/json" `
+    -Headers @{ Authorization = "Bearer $token" } `
+    -Body '{"title":"Fix the signup page","priority":"HIGH","assignedToId":3,"tags":["backend"]}'
+
+Mac / Linux:
+
+  curl -s -X POST http://localhost:3000/api/tasks \
+    -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
+    -d '{"title":"Fix the signup page","priority":"HIGH","assignedToId":3,"tags":["backend"]}'
+
+Expected: the new task back, with id 3, status TODO, priority HIGH,
+assignedTo showing Ravi Member, and tags showing backend.
+
+Also check the SERVER window (the first terminal). Because no SMTP is
+configured, it will print something like:
+
+  [email - no SMTP configured, not sent] To: member@demo.local |
+  Subject: New task assigned: Fix the signup page
+
+That printed line IS the assignment notification working. It is not an
+error. To send real emails, add SMTP settings to .env (Section 3).
+
+----------------------------------------
+6d. Move a task through the state machine
+----------------------------------------
+
+Valid moves ONLY:
+  TODO -> IN_PROGRESS -> REVIEW -> DONE
+  One step back is allowed: IN_PROGRESS -> TODO, REVIEW -> IN_PROGRESS
+  DONE -> IN_PROGRESS is allowed, to reopen a task.
+
+TODO -> DONE directly is REJECTED with a 400 error. That is intentional,
+it is the state machine validation from the P8 plan, not a bug.
+
+Try the valid move first. Task id 1 starts as IN_PROGRESS, so move it
+to REVIEW:
+
+Windows PowerShell:
+
+  Invoke-RestMethod -Method Patch -Uri http://localhost:3000/api/tasks/1 `
+    -ContentType "application/json" `
+    -Headers @{ Authorization = "Bearer $token" } `
+    -Body '{"status":"REVIEW"}'
+
+Mac / Linux:
+
+  curl -s -X PATCH http://localhost:3000/api/tasks/1 \
+    -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
+    -d '{"status":"REVIEW"}'
+
+Expected: the task back with status REVIEW.
+
+Now try the invalid move, to see the validation working. Task id 2
+starts as TODO, so trying to jump it straight to DONE should fail:
+
+Windows PowerShell:
+
+  Invoke-RestMethod -Method Patch -Uri http://localhost:3000/api/tasks/2 `
+    -ContentType "application/json" `
+    -Headers @{ Authorization = "Bearer $token" } `
+    -Body '{"status":"DONE"}'
+
+Mac / Linux:
+
+  curl -s -X PATCH http://localhost:3000/api/tasks/2 \
+    -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
+    -d '{"status":"DONE"}'
+
+Expected: an error JSON with message "Invalid status transition:
+TODO -> DONE" and HTTP status 400. Move it TODO -> IN_PROGRESS first,
+then IN_PROGRESS -> REVIEW, then REVIEW -> DONE, and it will succeed.
+
+----------------------------------------
+6e. Check the audit log for a task
+----------------------------------------
+
+Windows PowerShell:
+
+  Invoke-RestMethod -Uri http://localhost:3000/api/tasks/1/audit `
+    -Headers @{ Authorization = "Bearer $token" }
+
+Mac / Linux:
+
+  curl -s http://localhost:3000/api/tasks/1/audit -H "Authorization: Bearer $TOKEN"
+
+Expected: a list of audit log rows, newest first. Each row shows the
+field that changed, the old value, the new value, who changed it, and
+when. For example, after Section 6d you should see a row for the status
+change from IN_PROGRESS to REVIEW, with the manager's name on it.
+
+----------------------------------------
+6f. Dashboard and CSV export
+----------------------------------------
+
+Dashboard (totals, by status, by priority, overdue count):
+
+Windows PowerShell:
+
+  Invoke-RestMethod -Uri http://localhost:3000/api/dashboard `
+    -Headers @{ Authorization = "Bearer $token" }
+
+Mac / Linux:
+
+  curl -s http://localhost:3000/api/dashboard -H "Authorization: Bearer $TOKEN"
+
+CSV team report (downloads as team-report.csv in the current folder):
+
+Windows PowerShell:
+
+  Invoke-RestMethod -Uri "http://localhost:3000/api/dashboard/export?format=csv" `
+    -Headers @{ Authorization = "Bearer $token" } -OutFile team-report.csv
+
+Mac / Linux:
+
+  curl -s "http://localhost:3000/api/dashboard/export?format=csv" -H "Authorization: Bearer $TOKEN" -o team-report.csv
+
+Open team-report.csv in Excel or any spreadsheet app. It has columns:
+id, title, status, priority, dueDate, assignee, project.
+
+Without "?format=csv", the same endpoint returns JSON instead of CSV.
+
+================================================================================
+SECTION 7 - ALL API ENDPOINTS
+================================================================================
+
+Base URL: http://localhost:3000
+
+All routes EXCEPT /health, /api/auth/register, /api/auth/login,
+/api/auth/refresh and /api/auth/logout need this header on every request:
+
+  Authorization: Bearer <accessToken>
+
+Replace <accessToken> with the token you got from login (Section 6a).
+Do NOT include the < > brackets, and do NOT put quotes around the token
+in the header itself.
+
+AUTH
+  GET    /health
+         Anyone. Returns {"status":"ok","service":"task-manager-api"}.
+
+  POST   /api/auth/register
+         Anyone. Creates a MEMBER account only, even if you send a role.
+         Body: {"name":"Your Name","email":"you@example.com","password":"Password123!"}
+         Password must be at least 8 characters.
+
+  POST   /api/auth/login
+         Anyone. Returns user, accessToken (15 minutes) and refreshToken
+         (7 days).
+         Body: {"email":"manager@demo.local","password":"Password123!"}
+
+  POST   /api/auth/refresh
+         Anyone with a refresh token. Rotates the refresh token: the old
+         one is revoked and a new pair is issued.
+         Body: {"refreshToken":"<your refresh token>"}
+         If you try to reuse an old refresh token after rotating it, you
+         get 401 "Refresh token is invalid or expired". That is correct.
+
+  POST   /api/auth/logout
+         Anyone. Revokes the refresh token you send.
+         Body: {"refreshToken":"<your refresh token>"}
+
+  GET    /api/auth/me
+         Any logged-in user. Returns your own profile.
+
+  POST   /api/auth/users
+         ADMIN only. Creates a user with any role.
+         Body: {"name":"...","email":"...","password":"...","role":"MANAGER"}
+         Role must be ADMIN, MANAGER, or MEMBER. Default is MEMBER.
+
+PROJECTS
+  POST   /api/projects
+         ADMIN or MANAGER only.
+         Body: {"name":"Project Name","description":"Optional description"}
+
+  GET    /api/projects
+         Any logged-in user. Lists all projects, with owner and task count.
+
+  DELETE /api/projects/:id
+         ADMIN only. Deletes the project. Tasks in that project are kept
+         but their projectId is set to empty (null).
+
+TASKS
+  POST   /api/tasks
+         ADMIN, MANAGER, or MEMBER (see member rule below).
+         Body example:
+           {"title":"Fix the signup page","description":"Optional details",
+            "status":"TODO","priority":"HIGH",
+            "dueDate":"2026-11-20","projectId":1,"assignedToId":3,
+            "tags":["backend","urgent"]}
+         Only "title" is required. Status defaults to TODO, priority
+         defaults to MEDIUM, tags default to an empty list.
+         Status must be TODO, IN_PROGRESS, REVIEW, or DONE.
+         Priority must be LOW, MEDIUM, HIGH, or URGENT.
+         dueDate must be a date like "2026-11-20" (ISO format).
+
+  GET    /api/tasks
+         Any logged-in user. Lists tasks with pagination and filtering.
+         See "Task list query parameters" below.
+
+  GET    /api/tasks/:id
+         Any logged-in user. Returns one task, with assignee, creator,
+         project and tags included.
+
+  GET    /api/tasks/:id/audit
+         Any logged-in user. Returns the audit log for that task.
+
+  PATCH  /api/tasks/:id
+         ADMIN, MANAGER, or MEMBER (see member rule below).
+         Body can include any of: title, description, status, priority,
+         dueDate, projectId, assignedToId, tags. At least one field is
+         required. Status changes are checked against the state machine
+         in Section 6d.
+
+  DELETE /api/tasks/:id
+         ADMIN only. Deletes the task and its audit log rows.
+
+DASHBOARD AND EXPORT
+  GET    /api/dashboard
+         Any logged-in user. Returns total task count, overdue count
+         (due date in the past and status not DONE), counts by status,
+         and counts by priority.
+
+  GET    /api/dashboard/export
+         Any logged-in user. Returns the team report as JSON.
+         Add ?format=csv to download it as a CSV file instead.
+
+MEMBER RULE - READ THIS BEFORE TESTING RBAC
+  - A Member can ONLY create a task assigned to themselves (or to nobody).
+    Trying to create a task assigned to someone else returns 403.
+  - A Member can ONLY update tasks assigned to them.
+    Trying to update someone else's task returns 403.
+  - A Member CANNOT reassign tasks at all, even their own. Trying to send
+    assignedToId in an update returns 403.
+  - A Member CANNOT delete tasks, and CANNOT create projects.
+    Those return 403 as well.
+  - Admins and Managers can create, assign and update any task, and
+    Admins can delete tasks and projects.
+
+TASK LIST QUERY PARAMETERS - ALL OPTIONAL
+  ?page=1&limit=20
+  &status=TODO
+  &priority=HIGH
+  &assignedToId=3
+  &projectId=1
+  &search=login
+  &sortBy=dueDate&sortOrder=asc
+
+  Examples:
+    /api/tasks?status=TODO
+    /api/tasks?priority=HIGH&assignedToId=3
+    /api/tasks?search=login
+    /api/tasks?page=2&limit=10&sortBy=dueDate&sortOrder=asc
+
+  sortBy must be one of: createdAt, dueDate, priority, title.
+  Anything else falls back to createdAt.
+  sortOrder must be "asc" or "desc". Anything else falls back to desc.
+  limit is capped at 100, even if you ask for more.
+
+================================================================================
+SECTION 8 - RUN THE TESTS
+================================================================================
+
+Run this command in the project folder. The server does NOT need to be
+running for the tests:
+
+  npm test
+
+This runs Jest unit tests for:
+  - The status machine (allowed and rejected transitions)
+  - Joi validation (invalid priority rejected, valid task accepted)
+
+Expected output at the end:
+
+  Test Suites: 2 passed, 2 total
+  Tests:       6 passed, 6 total
+
+If a test fails, do NOT start the server and try to demo anyway. Read
+the failure message - it will name the exact test and the expected
+versus actual value.
+
+================================================================================
+SECTION 9 - PROJECT LAYOUT (MVC)
+================================================================================
+
+  src/
+    server.js              Starts the server (npm run dev / npm start)
+    app.js                 Express app: middleware, routes, error handler
+    config/
+      db.js                Database connection + table creation (Node built-in SQLite)
+      store.js             Data-access layer (SQL). Services call this,
+                           never raw SQL elsewhere.
+    routes/                URL -> controller mapping only, no business logic
+      authRoutes.js
+      taskRoutes.js
+      projectRoutes.js
+      dashboardRoutes.js
+    controllers/           Read the request, call a service, send the reply
+      authController.js
+      taskController.js
+      projectController.js
+      dashboardController.js
+    services/              Business logic: auth, task rules, audit, dashboard
+      authService.js
+      taskService.js
+    middleware/            Auth, roles, Joi validation, asyncHandler, errors
+      auth.js
+      validate.js
+      asyncHandler.js
+      errorHandler.js
+    validations/           Joi schemas for every request body
+      schemas.js
+    utils/                 Tokens, email, status machine
+      tokens.js
+      mail.js
+      statusMachine.js
+  prisma/
+    schema.prisma          Reference data model for the P8 Prisma stage.
+                           Same tables, columns and relations as the
+                           running code. See the note at the top of this file.
+    seed.js                Demo data (uses the built-in SQLite store)
+  tests/                   Jest tests
+    statusMachine.test.js
+    validation.test.js
+  .github/workflows/
+    ci.yml                 Runs the tests on every pull request
+
+Rule the code follows, and the whole point of the MVC requirement in P8:
+  - Controllers never talk to the database directly (except for simple
+    lookups in the project controller).
+  - Services never read the request (req) or response (res) objects.
+    They take plain data in, and return plain data out.
+  - Routes only map a URL to a controller. They contain no business logic.
+
+================================================================================
+SECTION 10 - SWITCHING TO MYSQL OR POSTGRESQL LATER (OPTIONAL)
+================================================================================
+
+The included prisma/schema.prisma already describes the same data model
+for MySQL or PostgreSQL. To use it instead of the built-in SQLite:
+
+  1. Install prisma and @prisma/client:
+       npm install prisma @prisma/client
+  2. In prisma/schema.prisma, change provider = "sqlite" to
+     provider = "mysql" (or "postgresql").
+  3. In .env, set DATABASE_URL to your database connection string.
+  4. Run: npx prisma db push
+  5. Point src/config/db.js at a PrismaClient export instead of the
+     built-in SQLite connection.
+
+The service and controller logic was written against that same shape
+(users, projects, tasks, tags, audit log, refresh tokens), so only the
+data layer file changes. Do not try to do this step unless your teacher
+specifically asks for Prisma - the built-in SQLite version already
+satisfies the API, RBAC, validation, audit and dashboard requirements.
+
+================================================================================
+SECTION 11 - TROUBLESHOOTING
+================================================================================
+
+1. "node is not recognised" / "npm is not recognised"
+   Node is not installed, or the terminal was opened before Node was
+   installed. Install Node 24 LTS, close the terminal completely, open
+   a new terminal, and run node --version again.
+
+2. "node:sqlite errors" / "DatabaseSync is not defined"
+   Your Node version is too old. This project needs Node 22.5 or newer.
+   Install Node 24 LTS, reopen the terminal, and confirm with
+   node --version.
+
+3. "Cannot find module" after npm install
+   You are probably in the wrong folder, or npm install did not finish.
+   Check that package.json is in the current folder, then run
+   npm install again and wait for it to finish.
+
+4. "Environment variable not found: DATABASE_URL"
+   You skipped Section 3. Make sure a file named exactly ".env"
+   (not ".env.txt") exists in the project folder, next to package.json.
+   If you used Windows Notepad to create it, it may have added .txt -
+   rename it to just ".env".
+
+5. "Port 3000 already in use"
+   Another program is already using port 3000. Either stop that program,
+   or change PORT=3000 in .env to PORT=3001, restart the server with
+   npm run dev, and use http://localhost:3001 in all the URLs above.
+
+6. "Access token is invalid or expired" (401)
+   Access tokens last 15 minutes by design. Log in again (Section 6a)
+   for a fresh token, or call POST /api/auth/refresh with your refresh
+   token (Section 7). This is normal, not a bug.
+
+7. "Refresh token is invalid or expired" (401)
+   Either the refresh token expired (7 days), or you already used it
+   once to rotate it. A refresh token can only be used once - after a
+   successful refresh, use the NEW refresh token from that response,
+   not the old one. If in doubt, log in again.
+
+8. "Missing or invalid Authorization header" (401)
+   You forgot the Authorization header, or your $token / $TOKEN variable
+   is empty. Log in again (Section 6a) and check that the token printed
+   out is a long string starting with eyJ. In PowerShell, remember that
+   the header is:
+     -Headers @{ Authorization = "Bearer $token" }
+   Note the word Bearer, a single space, then the token, all inside
+   double quotes.
+
+9. "Members can only update their own tasks" (403)
+   or "Members can only create tasks assigned to themselves" (403)
+   or "Members cannot reassign tasks" (403)
+   You are logged in as a Member trying to do something only Admins
+   and Managers can do. Log in as manager@demo.local or
+   admin@demo.local instead (Section 4 for passwords), or change the
+   request so the Member only touches their own tasks.
+
+10. "Forbidden: this route requires role ADMIN" (403)
+    You are trying an admin-only route (delete task/project, or create
+    a user with a role) while logged in as Manager or Member. Log in
+    as admin@demo.local.
+
+11. "Invalid status transition" (400)
+    You skipped a step in the state machine. Go TODO -> IN_PROGRESS ->
+    REVIEW -> DONE, in that order. See Section 6d for the full rules.
+
+12. "Validation failed" (400), with details listed
+    One of the fields you sent does not match the rules in Section 7.
+    Read the details array in the error - it names the exact field.
+    Common causes: password shorter than 8 characters, title shorter
+    than 2 characters, priority spelled wrong (must be LOW, MEDIUM,
+    HIGH or URGENT), status spelled wrong, or dueDate not in ISO date
+    format like "2026-11-20".
+
+13. "Email is already registered" (409)
+    That email already exists in the database, from seeding or from an
+    earlier register call. Log in with that email instead, or use a
+    different email to register.
+
+14. "Task not found" (404) / "Project not found" (404)
+    The id in the URL does not exist, or you deleted it earlier.
+    List tasks/projects first to get a valid id.
+
+15. "Route not found" (404)
+    The URL or method is wrong. Check the endpoint table in Section 7
+    carefully: method (GET/POST/PATCH/DELETE), spelling, and the /api/
+    prefix. For example, /tasks alone is wrong - it must be
+    /api/tasks.
+
+16. Database is locked / dev.db-journal errors
+    Stop the server (Ctrl + C in the server window), delete the file
+    dev.db-journal if it exists in the project folder, then run
+    npm run setup and start again. Do NOT delete dev.db unless you
+    want to lose all your data - if you do delete it, npm run setup
+    will recreate it with fresh seed data.
+
+17. Emails are not arriving
+    That is expected without SMTP. Check the server console - the
+    email text is printed there. Add SMTP settings to .env (Section 3)
+    to send real mail. For Gmail, remember to use an App Password.
+
+18. PowerShell curl errors, or "Invoke-WebRequest" in an error message
+    You used "curl" in PowerShell. Use Invoke-RestMethod as shown in
+    this file, or use "curl.exe" instead of "curl".
+
+19. "Task list is empty" after seeding
+    You probably ran npm run setup in a different folder, or you are
+    running the server from a different folder than the one you seeded
+    in. The dev.db file must be in the same project folder as the
+    server you started. Run npm run setup again in the server's folder,
+    restart the server, and list tasks again.
+
+================================================================================
+SECTION 12 - WHAT NOT TO DO
+================================================================================
+
+- Do NOT run npm install inside node_modules, and do NOT commit .env
+  or dev.db to git. Both are already in .gitignore.
+- Do NOT run the seed script against a production database. It creates
+  demo users with a known password (Password123!).
+- Do NOT share your .env file, your JWT secrets, or a real access token
+  in screenshots or in a public repo. Tokens expire in 15 minutes, but
+  a JWT secret in a public repo lets anyone forge tokens forever.
+- Do NOT edit prisma/schema.prisma and then expect the running code to
+  change automatically. The running code uses the tables created by
+  src/config/db.js, not the Prisma schema file. The schema file is a
+  reference for the Prisma stage only (see Section 10).
+- Do NOT delete dev.db while the server is running. Stop the server
+  first (Ctrl + C), then delete it if you really want a fresh start,
+  then run npm run setup again.
+- Do NOT change a task's status by editing the database directly to
+  skip the state machine, if you want to demo the validation. Use the
+  PATCH endpoint so the audit log records the change.
+
+================================================================================
+SECTION 13 - QUICK REFERENCE (THE WHOLE RUN, IN ORDER)
+================================================================================
+
+  1. Install Node.js 24 LTS, reopen terminal, check node --version
+  2. Unzip Task_Manager_API_P8.zip, open PowerShell/terminal in that folder
+  3. npm install
+  4. Copy-Item .env.example .env        (Windows)
+     cp .env.example .env               (Mac/Linux)
+  5. Edit .env if you want to change the JWT secrets (recommended)
+  6. npm run setup
+  7. npm run dev                         (keep this window open)
+  8. In a second terminal:
+       Log in as manager@demo.local / Password123!
+       Save the accessToken
+       GET  http://localhost:3000/api/tasks   with Authorization: Bearer <token>
+       POST http://localhost:3000/api/tasks   to create a task
+       PATCH http://localhost:3000/api/tasks/1 to move it to REVIEW
+       GET  http://localhost:3000/api/dashboard
+       GET  http://localhost:3000/api/dashboard/export?format=csv
+  9. npm test                            (in any terminal, server not needed)
+
+Demo logins again, for quick reference:
+  admin@demo.local    / Password123!   (Admin, id 1)
+  manager@demo.local  / Password123!   (Manager, id 2)
+  member@demo.local   / Password123!   (Member, id 3)
+
+================================================================================
+END OF INSTRUCTIONS
+================================================================================

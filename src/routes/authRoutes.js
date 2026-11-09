@@ -1,0 +1,13 @@
+const express = require('express');
+const c = require('../controllers/authController');
+const validate = require('../middleware/validate');
+const { registerSchema, loginSchema, createUserSchema } = require('../validations/schemas');
+const { requireAuth, requireRole } = require('../middleware/auth');
+const router = express.Router();
+router.post('/register', validate(registerSchema), c.register);
+router.post('/login', validate(loginSchema), c.login);
+router.post('/refresh', c.refresh);
+router.post('/logout', c.logout);
+router.get('/me', requireAuth, c.me);
+router.post('/users', requireAuth, requireRole('ADMIN'), validate(createUserSchema), c.createUser);
+module.exports = router;

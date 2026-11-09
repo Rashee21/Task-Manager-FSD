@@ -1,0 +1,11 @@
+const express = require('express');
+const c = require('../controllers/projectController');
+const validate = require('../middleware/validate');
+const { projectSchema } = require('../validations/schemas');
+const { requireAuth, requireRole } = require('../middleware/auth');
+const router = express.Router();
+router.use(requireAuth);
+router.post('/', requireRole('ADMIN', 'MANAGER'), validate(projectSchema), c.create);
+router.get('/', c.list);
+router.delete('/:id', requireRole('ADMIN'), c.remove);
+module.exports = router;

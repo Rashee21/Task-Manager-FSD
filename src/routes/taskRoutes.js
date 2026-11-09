@@ -1,0 +1,14 @@
+const express = require('express');
+const c = require('../controllers/taskController');
+const validate = require('../middleware/validate');
+const { taskCreateSchema, taskUpdateSchema } = require('../validations/schemas');
+const { requireAuth, requireRole } = require('../middleware/auth');
+const router = express.Router();
+router.use(requireAuth);
+router.post('/', validate(taskCreateSchema), c.create);
+router.get('/', c.list);
+router.get('/:id', c.getOne);
+router.get('/:id/audit', c.audit);
+router.patch('/:id', validate(taskUpdateSchema), c.update);
+router.delete('/:id', requireRole('ADMIN'), c.remove);
+module.exports = router;
